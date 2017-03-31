@@ -36,6 +36,7 @@ struct complex{
 	This function was written in reference to Lecture 19
 	The following is to represent the calculation of the even
 	part of the FFT.
+    param: complex array list of given samples, int k which output are we calculating
 */
 struct complex evenFFT(struct complex x[N], int k){
     int i;
@@ -53,6 +54,7 @@ struct complex evenFFT(struct complex x[N], int k){
 /*
 	This function will be used to compute the odd part of
 	the FFT.
+    param: complex array list of given samples, int k which output are we calculating
 */
 struct complex oddFFT(struct complex x[N], int k){
     int i;
@@ -66,7 +68,10 @@ struct complex oddFFT(struct complex x[N], int k){
     }
     return result;
 }
-
+/*
+ * twiddle factor needed for combining odd and even parts of fft
+ * param int k this is the final output location ie X[k]
+ */
 struct complex twiddleFact(int k)
 {
     struct complex result;
@@ -86,6 +91,7 @@ int main(int argc, char* argv[]){
     struct complex out[N];
     struct complex x[N], odd, even, twiddle;
     double realList[N], imgList[N];
+    //check if the size is correct if not close out
     if(size == 16 || size == 32)
     {
         int i = 7;
@@ -128,7 +134,7 @@ int main(int argc, char* argv[]){
 
                 out[k].real = even.real + (twiddle.real * odd.real);
                 out[k].imag = even.imag + (twiddle.imag * odd.imag);
-
+                //calculate the matching set of real imaginary
                 out[k + N/2].real = even.real + (twiddle.real * odd.real);
                 out[k + N/2].imag = even.imag - (twiddle.imag * odd.imag);
                 k++;
@@ -145,7 +151,7 @@ int main(int argc, char* argv[]){
                 even = evenFFT(x, k + offset); //even part
                 odd = oddFFT(x, k + offset); //odd part
                 twiddle = twiddleFact(k + offset);
-
+                //using the real and img list store all the values for calculated pairs
                 realList[k] = even.real + (twiddle.real * odd.real);
                 imgList[k] = even.imag + (twiddle.imag * odd.imag);
                 k++;
@@ -154,6 +160,7 @@ int main(int argc, char* argv[]){
                 k++;
             }
         }
+        //send both the real and imaginary parts
         MPI_Gather(&imgList,SUB,MPI_DOUBLE, &imgList,SUB,MPI_DOUBLE,0,MPI_COMM_WORLD);
         MPI_Gather(&realList, SUB,MPI_DOUBLE, &imgList,SUB,MPI_DOUBLE,0,MPI_COMM_WORLD);
         if(rank == 0)
@@ -161,6 +168,10 @@ int main(int argc, char* argv[]){
             int i =SUB;
             while(i < N)
             {
+                //combine the sent array in the correct order and into a sturct
+                //it is known that the array is sent in batches so we can calcuate
+                //the location of the matching pair for each X[k]
+                //ie X[k] and X[k + N/2]
                 out[i].real = realList[i];
                 out[i].imag = imgList[i];
 
@@ -169,6 +180,7 @@ int main(int argc, char* argv[]){
                 i += 2;
             }
 
+            //output into a txt file
             FILE* f = fopen("output.txt", "w");
             if (f == NULL)
             {
@@ -177,10 +189,14 @@ int main(int argc, char* argv[]){
             }
 
             //print to file
+            i = N;
+            fprintf(f, "TOTAL PROCESSED SMAPLES: %lf", i);
             i = 0;
+            fprintf(f, "=============================\n");
             while(i < N)
             {
-                fprintf(f, "X[%lf] %lf + %lfi\n", i, out[i].real, out[i].imag);
+                fprintf(f, "XR[%lf]: %lf  XR[%lf]: %lfi\n", i, out[i].real, i, out[i].imag);
+                fprintf(f, "=============================\n");
                 i++;
             }
 
@@ -190,4 +206,3 @@ int main(int argc, char* argv[]){
 
     return 0;
 }
-
